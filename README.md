@@ -59,6 +59,21 @@ export default defineConfig({
 ## 工作原理
 插件使用 @vue/compiler-sfc 解析 Vue 文件，并递归遍历 AST 以提取中文文本。对于 JavaScript 脚本，插件使用 Babel 解析和遍历 AST。提取的中文文本将被替换为国际化函数调用。
 
+## 注意
+> 该项目的默认配置是针对 [element-plus-admin](https://element-plus-admin.cn/) 项目，
+> 在其他项目中没有认真测试过
+
+1、针对 element-plus-admin 的项目修改
+- src/hooks/web/useI18n.ts
+![img.png](img.png)
+
+2、在开发环境中使用该插件项目会比较卡顿，而且在修改中文的时候整个页面会在5s后才刷新因为这里我用了防抖，所以建议在生成环境中才开启
+
+- 打包命令整理多语言库
+> "build:lang": "pnpm vite build --mode lang"
+> 
+> --mode lang 我获取 lang 作为整理标签
+
 
 ## 许可证
 MIT

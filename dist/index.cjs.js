@@ -330,7 +330,7 @@ function RollupI18nCreatePlugin(options) {
     let isLang = false;
     const configOption = {
         ...options,
-        injectToJS: options.injectToJS || `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
+        injectToJS: options.injectToJS ? `\n${options.injectToJS}\n` : `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
         i18nPath: options.i18nPath || 'src/locales/zh-CN.ts',
         langPath: options.langPath || ['src/locales/en.ts'],
         regi18n: options.regi18n || 'useI18n',
@@ -357,6 +357,7 @@ function RollupI18nCreatePlugin(options) {
         transform(code, id) {
             // 不是 vue 文件的时候不进行处理
             if (configOption.excludes.some(i => id.includes(i)) ||
+                id.includes('node_modules') ||
                 id.includes('\x00')) {
                 return code;
             }
