@@ -20,19 +20,49 @@ yarn add rollup-i18n-auto-create-plugin
 ## 使用方法
 
 ```javascript
-import { defineConfig } from 'vite'
-import i18nPlugin from 'rollup-i18n-auto-create-plugin'
+import RollupI18nCreatePlugin from 'rollup-i18n-auto-create-plugin'
 
 export default defineConfig({
   plugins: [
-    i18nPlugin({
-      i18nPath: 'path/to/your/i18n/file.json', // 语言文件路径
-      langPath: ['path/to/your/lang/file.json'], // 其他语言文件路径数组
-      injectToJS: 'import { useI18n } from \'vue-i18n\'\n',
-      open: true // 是否开启插件功能
-    })
+    RollupI18nCreatePlugin({
+      i18nPath: 'src/locales/zh-CN.ts',
+      langPath: ['src/locales/en.ts'],
+      injectToJS: `import { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()`,
+      excludes: ['locale', 'useI18n', 'node_modules'],
+      jsText: 't',
+      tempText: 't',
+      regi18n: 'useI18n'
+    }),
   ]
 })
-
 ```
 
+## 选项说明
+- i18nPath: 语言文件的路径。
+- langPath: 打包的时候处理语言文件的路径数组。
+- tempText: （可选）模板文本。
+- excludes： (可选) 排除文件名称。
+- jsText: （可选）JavaScript 模板文本。
+- regi18n: 判断是否要出入以来的文本，如果已经有就不需要插入，存在如果是注释的时候没有办法兼容。
+- injectToJS: （可选）要注入到 JavaScript 中的文本。
+
+```javascript
+  i18nPath: string
+  langPath: string[]
+  regi18n: string
+  excludes: string[]
+  tempText: string
+  jsText: string
+  injectToJS: string
+```
+
+## 工作原理
+插件使用 @vue/compiler-sfc 解析 Vue 文件，并递归遍历 AST 以提取中文文本。对于 JavaScript 脚本，插件使用 Babel 解析和遍历 AST。提取的中文文本将被替换为国际化函数调用。
+
+
+## 许可证
+MIT
+
+```javascript
+请根据实际情况调整上述内容。如果您有其他需要添加的信息或者有特定的格式要求，请告诉我。
+```

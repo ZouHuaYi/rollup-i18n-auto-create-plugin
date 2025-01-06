@@ -18,7 +18,7 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
 
   const configOption: OptionsType = {
     ...options,
-    injectToJS: options.injectToJS || `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
+    injectToJS: options.injectToJS ? `\n${options.injectToJS}\n` : `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
     i18nPath: options.i18nPath || 'src/locales/zh-CN.ts',
     langPath: options.langPath || ['src/locales/en.ts'],
     regi18n: options.regi18n || 'useI18n',
