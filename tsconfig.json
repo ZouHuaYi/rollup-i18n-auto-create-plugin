@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "outDir": "dist",
+    "declaration": true,
+    "declarationDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "typeRoots": ["./node_modules/@types", "./"], // 包含项目声明文件
+  "include": ["src", "globals.d.ts"]          // 确保声明文件被包含
+}
