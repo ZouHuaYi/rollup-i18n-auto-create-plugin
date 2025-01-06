@@ -74,6 +74,165 @@ export default defineConfig({
 > 
 > --mode lang 我获取 lang 作为整理标签
 
+## 老项目转化
+> 如果你是一个老的项目这种情况下要想愉快的使用该插件那么你就要把原来写的t(key)
+转化成中文，我写了一份转化的代码，可供大家参考
+
+下面转化代码不是万能的，这里只是针对了，大部分情况转化，组件属性比如 :title=t(key)，无法转化，剩余的自己手动处理吧！
+
+```javascript
+
+/*
+* 把你的中文映射文案的文件整理出来
+* */
+
+const fs = require('fs');
+const path = require('path');
+const { parse  } = require('@vue/compiler-sfc');
+const babelParser = require('@babel/parser');
+const babelTraverse = require('@babel/traverse').default;
+const jsgenerate = require('@babel/generator').default;
+const langMap = require('./zh-CN')
+
+// 处理vue文件
+function dwVueFile (file) {
+  let vueFileContent = fs.readFileSync(file, 'utf-8')
+  const { descriptor, errors } = parse(vueFileContent);
+
+  // 如果解析时发生错误，打印错误信息
+  if (errors && errors.length) {
+    console.error('Errors occurred while parsing the Vue file:', vuePath);
+    return;
+  }
+  const temp = dvVueCentent(descriptor.template)
+  if (temp) {
+    vueFileContent = vueFileContent.replace(descriptor.template.content, temp)
+  }
+  const dsScript = descriptor.script || descriptor.scriptSetup
+  let scriptTemp = dvTsCentent(dsScript.content)
+  if (scriptTemp) {
+    vueFileContent = vueFileContent.replace(dsScript.content, scriptTemp)
+  }
+  fs.writeFileSync(file, vueFileContent, 'utf-8');
+}
+
+// 处理js, ts，jsx等文件
+function dvTsFile (file) {
+  const content = fs.readFileSync(file, 'utf-8')
+  const code = dvTsCentent(content)
+  if (code) {
+    fs.writeFileSync(file, code, 'utf-8');
+  }
+}
+
+function dvTsCentent (content) {
+  if (!content) return;
+  const ast = babelParser.parse(content, {
+    sourceType: 'module',
+    plugins: ['jsx', 'typescript'],
+  });
+  let flag = false
+  babelTraverse(ast, {
+    CallExpression(path) {
+      try {
+        if (path.node.callee.name === 't') {
+          const pkey = objToStr(path.node.arguments[0].value)
+          if (pkey) {
+            if (path.parent.type === 'JSXExpressionContainer') {
+              if (path.parentPath.parent.type === 'JSXElement') {
+                // jsx 中的中文会带上双引号和单引号
+                path.parentPath.replaceWithSourceString(pkey)
+              } else {
+                // 这个是属性，和函数一类
+                path.parentPath.replaceWith({
+                  type: 'StringLiteral',
+                  value: pkey
+                })
+              }
+
+            } else {
+              path.replaceWithSourceString("'" + pkey + "'")
+            }
+            flag = true
+          }
+        }
+      } catch (e) { }
+    }
+  })
+  if (flag) {
+    return jsgenerate(ast, {
+      jsescOption: { minimal: true },
+    }).code
+  }
+}
+
+function dvVueCentent (template) {
+  if (!template || !template.content) {
+    console.log('No template content found.');
+    return;
+  }
+  let templateContent = template.content
+  // 全局替换正则
+  templateContent = templateContent.replace(/{{\s*t\('([^']+)'\)\s*}}/g, (_, matched) => {
+    return objToStr(matched) || '没有key'
+  });
+  return templateContent
+}
+
+// 替换为字符的函数和方法
+function objToStr (key) {
+  if (!key) return
+  try {
+    const keys = key?.split('.')
+    let objstr = langMap[keys[0]]
+    for (let i = 1; i < keys.length; i++) {
+      objstr = objstr[keys[i]]
+    }
+    return objstr
+  } catch (e) {
+    return `没有key ${key}`
+  }
+}
+
+// 读取文件夹中的.vue 文件
+function readVueFiles(dir) {
+  const vueFiles = [];
+  const jsFiles = []
+  // 递归函数来遍历目录
+  function traverseDirectory(currentPath) {
+    const files = fs.readdirSync(currentPath);
+    files.forEach(file => {
+      const filePath = path.join(currentPath, file);
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        // 如果是目录，则递归遍历
+        traverseDirectory(filePath);
+      } else if (path.extname(file) === '.vue') {
+        vueFiles.push(filePath);
+      } else if (['.ts', '.tsx', '.js'].includes(path.extname(file)) && !filePath.includes('locale')) {
+        jsFiles.push(filePath)
+      }
+    });
+  }
+  // 开始遍历
+  traverseDirectory(dir);
+  return {vue: vueFiles, js: jsFiles}
+}
+
+function init (dir) {
+  const {js, vue} = readVueFiles(dir)
+  js.forEach(file => {
+    dvTsFile(file)
+  })
+  vue.forEach(file => {
+    dwVueFile(file)
+  })
+}
+
+// 目录
+init('file\\src')
+
+```
 
 ## 许可证
 MIT
