@@ -141,7 +141,7 @@ const dealWithLangFile = debounce((i18nPath) => {
 }, 5000);
 
 // 对拼接的字符串进行处理整理
-function concatenatedString(str) {
+function concatenatedString(str, tempText) {
     const strList = extractQuotedStrings(str);
     if (!strList.length)
         return;
@@ -150,16 +150,15 @@ function concatenatedString(str) {
         strList.forEach((item) => {
             const key = getchinseKey(item.replace(/'|"/g, ''));
             if (key) {
-                strSource = strSource.replace(item, `t('${key}')`);
+                strSource = strSource.replace(item, `${tempText}('${key}')`);
             }
         });
         return strSource;
     }
 }
 // 提取 template 中的中文, 基本完成
-function extractChineseFromTemplate(content) {
+function extractChineseFromTemplate(content, tempText) {
     if (!content) {
-        console.log('No template content found.');
         return;
     }
     let templateContent = content;
@@ -178,12 +177,12 @@ function extractChineseFromTemplate(content) {
             if (tempStr) {
                 const key = getchinseKey(tempStr.key);
                 if (key) {
-                    const results = source.replace(node.content?.content.trim(), `t('${key}', { ${tempStr.data} })`);
+                    const results = source.replace(node.content?.content.trim(), `${tempText}('${key}', { ${tempStr.data} })`);
                     templateContent = templateContent.replace(source, results);
                 }
             }
             else {
-                const strSource = concatenatedString(node.content.content);
+                const strSource = concatenatedString(node.content.content, tempText);
                 if (strSource) {
                     const results = source.replace(node.content?.content.trim(), strSource);
                     templateContent = templateContent.replace(source, results);
@@ -194,7 +193,7 @@ function extractChineseFromTemplate(content) {
         if (node.type === 2) {
             const key = getchinseKey(node.content);
             if (key) {
-                const results = source.replace(node.content.trim(), `{{t('${key}')}}`);
+                const results = source.replace(node.content.trim(), `{{${tempText}('${key}')}}`);
                 templateContent = templateContent.replace(source, results);
             }
         }
@@ -208,12 +207,12 @@ function extractChineseFromTemplate(content) {
                         // 这个是纯的属性类型 title="我的测试"
                         const key = getchinseKey(item?.value?.content);
                         if (key) {
-                            pstr = pstr.replace(item.loc.source, `:${item.name}="t('${key}')"`);
+                            pstr = pstr.replace(item.loc.source, `:${item.name}="${tempText}('${key}')"`);
                         }
                     }
                     else if (item.type === 7 && item.exp?.content) {
                         // 这里是一个bind 这里统一对 等号后面的字符串提取出来处理
-                        const strSource = concatenatedString(item.exp.content);
+                        const strSource = concatenatedString(item.exp.content, tempText);
                         if (strSource) {
                             pstr = pstr.replace(item.exp.content, strSource);
                         }
@@ -242,7 +241,7 @@ const traverse = _traverse.default;
 //@ts-ignore
 const generate = _generate.default;
 // 提取 script 中的中文
-function extractChineseFromScript(content) {
+function extractChineseFromScript(content, jsText) {
     if (!content)
         return;
     let flag = false; // 是否有更新
@@ -266,11 +265,11 @@ function extractChineseFromScript(content) {
             const key = getchinseKey(path.node.value);
             if (key) {
                 if (parent.type === 'JSXAttribute') {
-                    path.node.extra.raw = `{t('${key}')}`;
+                    path.node.extra.raw = `{${jsText}('${key}')}`;
                 }
                 else {
                     // 其他的jsx 基本就是直接替换
-                    path.node.extra.raw = `t('${key}')`;
+                    path.node.extra.raw = `${jsText}('${key}')`;
                 }
                 flag = true;
             }
@@ -299,7 +298,7 @@ function extractChineseFromScript(content) {
                 });
                 const key = getchinseKey(transformedTemplate);
                 const keyData = JSON.stringify(placeholders).replace(/\"/g, '');
-                path.replaceWithSourceString(`t('${key}',${keyData})`);
+                path.replaceWithSourceString(`${jsText}('${key}',${keyData})`);
                 flag = true;
             }
         },
@@ -309,7 +308,7 @@ function extractChineseFromScript(content) {
                 JSXText(node) {
                     const key = getchinseKey(node.node.value);
                     if (key) {
-                        node.node.value = `{t('${key}')}`;
+                        node.node.value = `{${jsText}('${key}')}`;
                         flag = true;
                     }
                 },
@@ -329,6 +328,16 @@ function RollupI18nCreatePlugin(options) {
     let root = '';
     let isPro = false;
     let isLang = false;
+    const configOption = {
+        ...options,
+        injectToJS: options.injectToJS || `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
+        i18nPath: options.i18nPath || 'src/locales/zh-CN.ts',
+        langPath: options.langPath || ['src/locales/en.ts'],
+        regi18n: options.regi18n || 'useI18n',
+        excludes: options.excludes || ['locale', 'useI18n'],
+        tempText: options.tempText || 't',
+        jsText: options.jsText || 't'
+    };
     return {
         name: 'rollup-i18n-auto-create-plugin', // 插件名称
         enforce: 'pre', // 插件执行阶段（pre/normal/post）
@@ -338,7 +347,7 @@ function RollupI18nCreatePlugin(options) {
             isLang = config.mode === 'lang';
             translationsMap = {};
             if (!isPro) {
-                const obj = getFileJson(path.resolve(root, options.i18nPath));
+                const obj = getFileJson(path.resolve(root, configOption.i18nPath));
                 // 映射到全局之中去，反向映射出来
                 Object.keys(obj).forEach(key => {
                     translationsMap[key] = obj[key];
@@ -347,21 +356,18 @@ function RollupI18nCreatePlugin(options) {
         },
         transform(code, id) {
             // 不是 vue 文件的时候不进行处理
-            if (!options.open ||
-                id.includes('locale') ||
-                id.includes('useI18n') ||
-                id.includes('node_modules') ||
+            if (configOption.excludes.some(i => id.includes(i)) ||
                 id.includes('\x00')) {
                 return code;
             }
             let rewrittenScript = code;
             if (id.endsWith('.vue')) {
-                rewrittenScript = processVueFile(id, options) || '';
+                rewrittenScript = processVueFile(id, configOption) || '';
             }
             else if (['.ts', '.js', '.jsx', '.tsx'].some(i => id.split('?')[0].endsWith(i))) {
-                rewrittenScript = proesssJsFile(id, options);
+                rewrittenScript = proesssJsFile(id, configOption);
             }
-            const langFile = path.resolve(root, options.i18nPath);
+            const langFile = path.resolve(root, configOption.i18nPath);
             if (!isPro && addTranslations.length) {
                 dealWithLangFile(langFile);
                 addTranslations = [];
@@ -395,9 +401,10 @@ function RollupI18nCreatePlugin(options) {
 }
 function proesssJsFile(jsFilePath, options) {
     const jsFileContent = fs.readFileSync(jsFilePath, 'utf-8');
-    let scriptTemp = extractChineseFromScript(jsFileContent);
+    let scriptTemp = extractChineseFromScript(jsFileContent, options.jsText);
     if (scriptTemp) {
-        if (!/useI18n/.test(jsFileContent)) {
+        // 排除如果没有引入的值直接不处理
+        if (options.regi18n && !jsFileContent.includes(options.regi18n)) {
             scriptTemp = `${options.injectToJS}${scriptTemp}`;
         }
         return scriptTemp;
@@ -414,16 +421,16 @@ function processVueFile(vueFilePath, options) {
         console.error('Errors occurred while parsing the Vue file:', vueFilePath);
         return;
     }
-    const vueTemplate = extractChineseFromTemplate(descriptor.template?.content || '');
+    const vueTemplate = extractChineseFromTemplate(descriptor.template?.content || '', options.tempText);
     if (vueTemplate && descriptor.template?.content) {
         vueFileContent = vueFileContent.replace(descriptor.template.content, vueTemplate);
     }
     const dsScript = descriptor.script || descriptor.scriptSetup;
     if (dsScript?.content) {
-        let scriptTemp = extractChineseFromScript(dsScript.content);
+        let scriptTemp = extractChineseFromScript(dsScript.content, options.jsText);
         if (scriptTemp) {
             // 这里对字符串进行判断是否要注入js在里面, 如果文本没有修改
-            if (!/useI18n/.test(scriptTemp)) {
+            if (options.regi18n && !scriptTemp.includes(options.regi18n)) {
                 scriptTemp = `${options.injectToJS}${scriptTemp}`;
             }
             vueFileContent = vueFileContent.replace(dsScript.content, scriptTemp);
@@ -431,7 +438,7 @@ function processVueFile(vueFilePath, options) {
         else if (vueTemplate !== descriptor.template?.content) {
             // 这里对字符串进行判断是否要注入js在里面, 如果文本没有修改
             let strcontent = dsScript.content;
-            if (!/useI18n/.test(strcontent)) {
+            if (options.regi18n && !strcontent.includes(options.regi18n)) {
                 strcontent = `${options.injectToJS}${strcontent}`;
             }
             vueFileContent = vueFileContent.replace(dsScript.content, strcontent);

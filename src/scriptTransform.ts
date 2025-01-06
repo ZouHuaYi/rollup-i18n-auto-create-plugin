@@ -11,9 +11,10 @@ import {
   containsChinese,
   getchinseKey
 } from './utils'
+import {OptionsType} from "./types";
 
 // 提取 script 中的中文
-export function extractChineseFromScript(content: string) {
+export function extractChineseFromScript(content: string, jsText: string) {
   if (!content) return;
 
   let flag = false // 是否有更新
@@ -40,10 +41,10 @@ export function extractChineseFromScript(content: string) {
       const key = getchinseKey(path.node.value)
       if (key) {
         if (parent.type === 'JSXAttribute') {
-          path.node.extra.raw = `{t('${key}')}`
+          path.node.extra.raw = `{${jsText}('${key}')}`
         } else {
           // 其他的jsx 基本就是直接替换
-          path.node.extra.raw = `t('${key}')`
+          path.node.extra.raw = `${jsText}('${key}')`
         }
         flag = true
       }
@@ -73,7 +74,7 @@ export function extractChineseFromScript(content: string) {
         const key = getchinseKey(transformedTemplate)
         const regex = new RegExp('`' + rawTemplate + '`');
         const keyData = JSON.stringify(placeholders).replace(/\"/g, '')
-        path.replaceWithSourceString(`t('${key}',${keyData})`)
+        path.replaceWithSourceString(`${jsText}('${key}',${keyData})`)
         flag = true
       }
     },
@@ -83,7 +84,7 @@ export function extractChineseFromScript(content: string) {
         JSXText(node: any) {
           const key = getchinseKey(node.node.value)
           if (key) {
-            node.node.value = `{t('${key}')}`
+            node.node.value = `{${jsText}('${key}')}`
             flag = true
           }
         },

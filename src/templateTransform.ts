@@ -7,7 +7,7 @@ import {
 import { parse } from '@vue/compiler-sfc';
 
 // 对拼接的字符串进行处理整理
-export function concatenatedString (str: string) {
+export function concatenatedString (str: string, tempText: string) {
   const strList = extractQuotedStrings(str)
   if (!strList.length) return
   if (strList.length) {
@@ -15,7 +15,7 @@ export function concatenatedString (str: string) {
     strList.forEach((item:string) => {
       const key = getchinseKey(item.replace(/'|"/g, ''))
       if (key) {
-        strSource = strSource.replace(item, `t('${key}')`)
+        strSource = strSource.replace(item, `${tempText}('${key}')`)
       }
     })
     return strSource
@@ -23,7 +23,7 @@ export function concatenatedString (str: string) {
 }
 
 // 提取 template 中的中文, 基本完成
-export function extractChineseFromTemplate(content:string) {
+export function extractChineseFromTemplate(content:string, tempText: string) {
   if (!content) {
     return;
   }
@@ -44,11 +44,11 @@ export function extractChineseFromTemplate(content:string) {
       if (tempStr) {
         const key = getchinseKey(tempStr.key)
         if (key) {
-         const results = source.replace(node.content?.content.trim(), `t('${key}', { ${tempStr.data} })`)
+         const results = source.replace(node.content?.content.trim(), `${tempText}('${key}', { ${tempStr.data} })`)
           templateContent = templateContent.replace(source, results)
         }
       } else {
-        const strSource = concatenatedString(node.content.content)
+        const strSource = concatenatedString(node.content.content, tempText)
         if (strSource) {
           const results = source.replace(node.content?.content.trim(), strSource)
           templateContent = templateContent.replace(source, results)
@@ -59,7 +59,7 @@ export function extractChineseFromTemplate(content:string) {
     if (node.type === 2) {
       const key = getchinseKey(node.content)
       if (key) {
-        const results = source.replace(node.content.trim(), `{{t('${key}')}}`)
+        const results = source.replace(node.content.trim(), `{{${tempText}('${key}')}}`)
         templateContent = templateContent.replace(source, results)
       }
     }
@@ -73,11 +73,11 @@ export function extractChineseFromTemplate(content:string) {
             // 这个是纯的属性类型 title="我的测试"
             const key = getchinseKey(item?.value?.content)
             if (key) {
-              pstr = pstr.replace(item.loc.source, `:${item.name}="t('${key}')"`)
+              pstr = pstr.replace(item.loc.source, `:${item.name}="${tempText}('${key}')"`)
             }
           } else if (item.type === 7 && item.exp?.content) {
             // 这里是一个bind 这里统一对 等号后面的字符串提取出来处理
-            const strSource = concatenatedString(item.exp.content)
+            const strSource = concatenatedString(item.exp.content, tempText)
             if (strSource) {
               pstr = pstr.replace(item.exp.content, strSource)
             }
