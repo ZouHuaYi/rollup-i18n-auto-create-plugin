@@ -7,4 +7,6 @@ export interface OptionsType{
   tempText: string
   jsText: string
   injectToJS?: string
+  delay: number
+  reserveKeys: string[]
 }

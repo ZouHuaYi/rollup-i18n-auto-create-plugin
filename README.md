@@ -31,7 +31,9 @@ export default defineConfig({
       excludes: ['locale', 'useI18n', 'node_modules'],
       jsText: 't',
       tempText: 't',
-      regi18n: 'useI18n'
+      regi18n: 'useI18n',
+      delay: 1000,
+      reserveKeys: ['test']
     }),
   ]
 })
@@ -45,15 +47,19 @@ export default defineConfig({
 - jsText: （可选）JavaScript 模板文本。
 - regi18n: 判断是否要出入以来的文本，如果已经有就不需要插入，存在如果是注释的时候没有办法兼容。
 - injectToJS: （可选）要注入到 JavaScript 中的文本。
+- delay: （可选）处理文件之间的延迟时间，默认为 1000。
+- reserveKeys: (可选) 需要保留的key
 
 ```javascript
-  i18nPath: string
-  langPath: string[]
-  regi18n: string
-  excludes: string[]
-  tempText: string
-  jsText: string
-  injectToJS: string
+i18nPath: string
+langPath: string[]
+regi18n: string
+excludes: string[]
+tempText: string
+jsText: string
+injectToJS?: string
+delay: number
+reserveKeys: string[]
 ```
 
 ## 工作原理

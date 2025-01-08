@@ -15,8 +15,8 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
   let root = '';
   let isPro = false
   let isLang = false
-
-  const configOption: OptionsType = {
+  // 配置
+   configOption = {
     ...options,
     injectToJS: options.injectToJS ? `\n${options.injectToJS}\n` : `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
     i18nPath: options.i18nPath || 'src/locales/zh-CN.ts',
@@ -24,8 +24,10 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
     regi18n: options.regi18n || 'useI18n',
     excludes: options.excludes || ['locale', 'useI18n'],
     tempText: options.tempText || 't',
-    jsText: options.jsText || 't'
-  }
+    jsText: options.jsText || 't',
+    delay: options.delay || 1000,
+    reserveKeys: options.reserveKeys || []
+   }
 
   return {
     name: 'rollup-i18n-auto-create-plugin', // 插件名称
@@ -36,10 +38,19 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
       isLang = config.mode === 'lang'
       translationsMap = {}
       if (!isPro) {
+        // 开发环境保留所有字段不进行任何的优化
         const obj = getFileJson(resolve(root, configOption.i18nPath))
         // 映射到全局之中去，反向映射出来
         Object.keys(obj).forEach(key => {
           translationsMap[key] = obj[key]
+        })
+      } else if (configOption.reserveKeys.length) {
+        // 生产环境下对代码
+        const obj = getFileJson(resolve(root, configOption.i18nPath))
+        Object.keys(obj).forEach(key => {
+          if (configOption.reserveKeys.includes(key)) {
+            translationsMap[key] = obj[key]
+          }
         })
       }
     },

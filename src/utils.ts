@@ -130,4 +130,4 @@ function debounce<T extends (...args: any[]) => any>(
 // 整理多语言文件
 export const dealWithLangFile = debounce((i18nPath: string) => {
   updateJSONInFile(i18nPath, translationsMap)
-}, 5000)
+}, configOption.delay)
