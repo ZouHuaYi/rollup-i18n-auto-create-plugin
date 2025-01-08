@@ -7,8 +7,6 @@ import * as babelParser from '@babel/parser';
 import _traverse from '@babel/traverse';
 import _generate from '@babel/generator';
 
-const key = crypto.createHash('sha256').update('i18n').digest();
-const iv = Buffer.alloc(16, 0);
 // 中文字符匹配函数（判断字符串是否包含中文字符）
 function containsChinese(str) {
     return /[\u4e00-\u9fa5]/.test(str);
@@ -46,11 +44,9 @@ function extractTransformString(str) {
 }
 // 生成唯一key
 function generateKey(chineseStr) {
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-    let encrypted = cipher.update(chineseStr, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
+    const hash = crypto.createHmac('sha256', 'i18n').update(chineseStr).digest('hex');
     // 保留加密结果的前16位
-    return encrypted;
+    return hash.slice(0, 16);
 }
 // 获取和收集key
 function getchinseKey(text) {
