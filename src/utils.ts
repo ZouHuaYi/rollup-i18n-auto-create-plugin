@@ -2,9 +2,6 @@ import crypto from 'crypto'
 import fs  from 'fs'
 import JSON5  from 'json5'
 
-const key = crypto.createHash('sha256').update('i18n').digest();
-const iv = Buffer.alloc(16, 0);
-
 // 中文字符匹配函数（判断字符串是否包含中文字符）
 export function containsChinese(str: string) {
   return /[\u4e00-\u9fa5]/.test(str);
@@ -51,11 +48,9 @@ export function extractTransformString(str: string) {
 
 // 生成唯一key
 function generateKey(chineseStr: string) {
-  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-  let encrypted = cipher.update(chineseStr, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
+  const hash = crypto.createHmac('sha256', 'i18n').update(chineseStr).digest('hex');
   // 保留加密结果的前16位
-  return encrypted
+  return hash.slice(0, 16)
 }
 
 // 获取和收集key
