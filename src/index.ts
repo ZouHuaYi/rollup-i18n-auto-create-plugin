@@ -80,8 +80,20 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
             const lf = resolve(root, item)
             const lm = getFileJson(lf)
             const obj: any = {}
+            const endList: any = []
+            // 将未翻译的语言包也加入到最后
             Object.keys(translationsMap).forEach(key => {
-              obj[key] = lm[key] || translationsMap[key]
+              if (lm[key]) {
+                obj[key] = lm[key]
+              } else {
+                endList.push({
+                  key: key,
+                  value: translationsMap[key]
+                })
+              }
+            })
+            endList.forEach((item: any) => {
+              obj[item.key] = item.value
             })
             updateJSONInFile(lf, obj)
           })
