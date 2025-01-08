@@ -131,10 +131,6 @@ function debounce(func, wait, immediate = false) {
         }
     };
 }
-// 整理多语言文件
-const dealWithLangFile = debounce((i18nPath) => {
-    updateJSONInFile(i18nPath, translationsMap);
-}, 5000);
 
 // 对拼接的字符串进行处理整理
 function concatenatedString(str, tempText) {
@@ -324,6 +320,7 @@ function RollupI18nCreatePlugin(options) {
     let root = '';
     let isPro = false;
     let isLang = false;
+    // 配置
     const configOption = {
         ...options,
         injectToJS: options.injectToJS ? `\n${options.injectToJS}\n` : `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
@@ -332,8 +329,13 @@ function RollupI18nCreatePlugin(options) {
         regi18n: options.regi18n || 'useI18n',
         excludes: options.excludes || ['locale', 'useI18n'],
         tempText: options.tempText || 't',
-        jsText: options.jsText || 't'
+        jsText: options.jsText || 't',
+        delay: options.delay || 1000,
+        reserveKeys: options.reserveKeys || []
     };
+    const dealWithLangFile = debounce((i18nPath) => {
+        updateJSONInFile(i18nPath, translationsMap);
+    }, configOption.delay);
     return {
         name: 'rollup-i18n-auto-create-plugin', // 插件名称
         enforce: 'pre', // 插件执行阶段（pre/normal/post）
@@ -343,10 +345,20 @@ function RollupI18nCreatePlugin(options) {
             isLang = config.mode === 'lang';
             translationsMap = {};
             if (!isPro) {
+                // 开发环境保留所有字段不进行任何的优化
                 const obj = getFileJson(path.resolve(root, configOption.i18nPath));
                 // 映射到全局之中去，反向映射出来
                 Object.keys(obj).forEach(key => {
                     translationsMap[key] = obj[key];
+                });
+            }
+            else if (configOption.reserveKeys.length) {
+                // 生产环境下对代码
+                const obj = getFileJson(path.resolve(root, configOption.i18nPath));
+                Object.keys(obj).forEach(key => {
+                    if (configOption.reserveKeys.includes(key)) {
+                        translationsMap[key] = obj[key];
+                    }
                 });
             }
         },

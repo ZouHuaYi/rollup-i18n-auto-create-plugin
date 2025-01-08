@@ -5,7 +5,7 @@ import { resolve } from 'path';
 import { parse } from '@vue/compiler-sfc';
 import { extractChineseFromTemplate } from './templateTransform'
 import { extractChineseFromScript } from './scriptTransform'
-import {dealWithLangFile, getFileJson, updateJSONInFile} from './utils'
+import {getFileJson, updateJSONInFile, debounce} from './utils'
 
 globalThis.translationsMap = {}
 globalThis.addTranslations = []
@@ -16,7 +16,7 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
   let isPro = false
   let isLang = false
   // 配置
-   configOption = {
+   const configOption = {
     ...options,
     injectToJS: options.injectToJS ? `\n${options.injectToJS}\n` : `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
     i18nPath: options.i18nPath || 'src/locales/zh-CN.ts',
@@ -28,6 +28,11 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
     delay: options.delay || 1000,
     reserveKeys: options.reserveKeys || []
    }
+
+  const dealWithLangFile = debounce((i18nPath: string) => {
+    updateJSONInFile(i18nPath, translationsMap)
+  }, configOption.delay)
+
 
   return {
     name: 'rollup-i18n-auto-create-plugin', // 插件名称

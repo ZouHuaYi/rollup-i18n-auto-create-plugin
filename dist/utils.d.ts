@@ -8,4 +8,4 @@ export declare function extractTransformString(str: string): {
 export declare function getchinseKey(text: string): string;
 export declare function getFileJson(filePath: string): any;
 export declare function updateJSONInFile(filePath: string, obj: any): void;
-export declare const dealWithLangFile: (i18nPath: string) => void;
+export declare function debounce<T extends (...args: any[]) => any>(func: T, wait: number, immediate?: boolean): (...args: Parameters<T>) => void;

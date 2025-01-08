@@ -96,7 +96,7 @@ export function updateJSONInFile(filePath: string, obj: any) {
   fs.writeFileSync(filePath, newFileContent, 'utf8');
 }
 
-function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number,
   immediate = false
@@ -126,8 +126,3 @@ function debounce<T extends (...args: any[]) => any>(
     }
   };
 }
-
-// 整理多语言文件
-export const dealWithLangFile = debounce((i18nPath: string) => {
-  updateJSONInFile(i18nPath, translationsMap)
-}, configOption.delay)
