@@ -28,7 +28,7 @@ function _interopNamespaceDefault(e) {
 
 var babelParser__namespace = /*#__PURE__*/_interopNamespaceDefault(babelParser);
 
-const key = crypto.createHash('sha256').update('zhy').digest();
+const key = crypto.createHash('sha256').update('i18n').digest();
 const iv = Buffer.alloc(16, 0);
 // 中文字符匹配函数（判断字符串是否包含中文字符）
 function containsChinese(str) {
@@ -71,7 +71,7 @@ function generateKey(chineseStr) {
     let encrypted = cipher.update(chineseStr, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     // 保留加密结果的前16位
-    return encrypted.slice(0, 16);
+    return encrypted;
 }
 // 获取和收集key
 function getchinseKey(text) {
@@ -390,8 +390,21 @@ function RollupI18nCreatePlugin(options) {
                         const lf = path.resolve(root, item);
                         const lm = getFileJson(lf);
                         const obj = {};
+                        const endList = [];
+                        // 将未翻译的语言包也加入到最后
                         Object.keys(translationsMap).forEach(key => {
-                            obj[key] = lm[key] || translationsMap[key];
+                            if (lm[key]) {
+                                obj[key] = lm[key];
+                            }
+                            else {
+                                endList.push({
+                                    key: key,
+                                    value: translationsMap[key]
+                                });
+                            }
+                        });
+                        endList.forEach((item) => {
+                            obj[item.key] = item.value;
                         });
                         updateJSONInFile(lf, obj);
                     });
