@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import fs  from 'fs'
 import JSON5  from 'json5'
 
-const key = crypto.createHash('sha256').update('zhy').digest();
+const key = crypto.createHash('sha256').update('i18n').digest();
 const iv = Buffer.alloc(16, 0);
 
 // 中文字符匹配函数（判断字符串是否包含中文字符）
@@ -55,7 +55,7 @@ function generateKey(chineseStr: string) {
   let encrypted = cipher.update(chineseStr, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   // 保留加密结果的前16位
-  return encrypted.slice(0, 16);
+  return encrypted
 }
 
 // 获取和收集key
