@@ -14,7 +14,6 @@ globalThis.useTranslations = []
 export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
   let root = '';
   let isPro = false
-  let isLang = false
   // 配置
    const configOption = {
     ...options,
@@ -26,7 +25,8 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
     tempText: options.tempText || 't',
     jsText: options.jsText || 't',
     delay: options.delay || 1000,
-    reserveKeys: options.reserveKeys || []
+    reserveKeys: options.reserveKeys || [],
+    runBuild: options.runBuild || false,
    }
 
   const dealWithLangFile = debounce((i18nPath: string) => {
@@ -40,7 +40,6 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
     configResolved(config) {
       root = config.root;
       isPro = config.isProduction
-      isLang = config.mode === 'lang'
       translationsMap = {}
       if (!isPro) {
         // 开发环境保留所有字段不进行任何的优化
@@ -86,7 +85,7 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
     },
     buildEnd() {
       // 打包构建的时候执行该代码, 这是打包阶段的了也是我们测试的时候使用
-      if (isLang) {
+      if (configOption.runBuild) {
         const langFile = resolve(root, options.i18nPath)
         // 这里整理所有的语言数据，所有的都是新的语言包，
         updateJSONInFile(langFile, translationsMap)

@@ -9,4 +9,5 @@ export interface OptionsType{
   injectToJS?: string
   delay: number
   reserveKeys: string[]
+  runBuild: boolean
 }

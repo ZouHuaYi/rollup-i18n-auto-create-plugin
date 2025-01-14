@@ -49,6 +49,7 @@ export default defineConfig({
 - injectToJS: （可选）要注入到 JavaScript 中的文本。
 - delay: （可选）处理文件之间的延迟时间，默认为 1000。
 - reserveKeys: (可选) 需要保留的key
+- runBuild: (可选) 打包的时候是否需要执行整理多语言文件。
 
 ```javascript
 i18nPath: string
@@ -60,6 +61,7 @@ jsText: string
 injectToJS?: string
 delay: number
 reserveKeys: string[]
+runBuild: boolean
 ```
 
 ## 工作原理
@@ -73,12 +75,11 @@ reserveKeys: string[]
 - src/hooks/web/useI18n.ts
 ![img.png](img.png)
 
-2、在开发环境中使用该插件项目会比较卡顿，而且在修改中文的时候整个页面会在5s后才刷新因为这里我用了防抖，所以建议在生成环境中才开启
+2、在开发环境中使用该插件项目会比较卡顿，而且在修改中文的时候整个页面会在1s后才刷新因为这里我用了防抖，所以建议在生成环境中才开启
 
-- 打包命令整理多语言库
-> "build:lang": "pnpm vite build --mode lang"
-> 
-> --mode lang 我获取 lang 作为整理标签
+- 配置整理多语言文件
+> 在打包环境下配置 runBuild: true, 会自动对语言文件进行整理
+
 
 ## 老项目转化
 > 如果你是一个老的项目这种情况下要想愉快的使用该插件那么你就要把原来写的t(key)
