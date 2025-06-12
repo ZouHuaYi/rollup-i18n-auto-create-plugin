@@ -4,8 +4,8 @@ import { parse } from '@vue/compiler-sfc';
 import crypto from 'crypto';
 import JSON5 from 'json5';
 import * as babelParser from '@babel/parser';
-import _traverse from '@babel/traverse';
 import _generate from '@babel/generator';
+import _traverse from '@babel/traverse';
 
 // 中文字符匹配函数（判断字符串是否包含中文字符）
 function containsChinese(str) {
@@ -52,7 +52,7 @@ function generateKey(chineseStr) {
 function getchinseKey(text) {
     let key = '';
     if (containsChinese(text)) {
-        const chineseText = text.trim();
+        const chineseText = text.trim().replace(/^&%&/, '');
         key = generateKey(chineseText);
         if (!translationsMap[key]) {
             addTranslations.push({
@@ -63,7 +63,15 @@ function getchinseKey(text) {
         // 这里一定是 use key ,使用的key值，修改中文和书写中文的时候会一个 标注
         translationsMap[key] = chineseText;
     }
-    return key;
+    let isKey = false;
+    if (text) {
+        // 使用正则的方法进行判断
+        isKey = /^\&%\&/.test(text);
+    }
+    return {
+        key,
+        isKey
+    };
 }
 // 读取文件映射相关的内容
 function getFileJson(filePath) {
@@ -119,7 +127,7 @@ function concatenatedString(str, tempText) {
     if (strList.length) {
         let strSource = str;
         strList.forEach((item) => {
-            const key = getchinseKey(item.replace(/'|"/g, ''));
+            const { key } = getchinseKey(item.replace(/'|"/g, ''));
             if (key) {
                 strSource = strSource.replace(item, `${tempText}('${key}')`);
             }
@@ -146,7 +154,7 @@ function extractChineseFromTemplate(content, tempText) {
         if (node.type === 5 && containsChinese(node.content?.content)) {
             const tempStr = extractTransformString(node.content.content);
             if (tempStr) {
-                const key = getchinseKey(tempStr.key);
+                const { key } = getchinseKey(tempStr.key);
                 if (key) {
                     const results = source.replace(node.content?.content.trim(), `${tempText}('${key}', { ${tempStr.data} })`);
                     templateContent = templateContent.replace(source, results);
@@ -162,7 +170,7 @@ function extractChineseFromTemplate(content, tempText) {
         }
         // 这是 TEXT 类型
         if (node.type === 2) {
-            const key = getchinseKey(node.content);
+            const { key } = getchinseKey(node.content);
             if (key) {
                 const results = source.replace(node.content.trim(), `{{${tempText}('${key}')}}`);
                 templateContent = templateContent.replace(source, results);
@@ -176,7 +184,7 @@ function extractChineseFromTemplate(content, tempText) {
                 node.props.forEach((item) => {
                     if (item.type === 6) {
                         // 这个是纯的属性类型 title="我的测试"
-                        const key = getchinseKey(item?.value?.content);
+                        const { key } = getchinseKey(item?.value?.content);
                         if (key) {
                             pstr = pstr.replace(item.loc.source, `:${item.name}="${tempText}('${key}')"`);
                         }
@@ -233,14 +241,24 @@ function extractChineseFromScript(content, jsText) {
                     return;
                 }
             }
-            const key = getchinseKey(path.node.value);
+            const { key, isKey } = getchinseKey(path.node.value);
             if (key) {
                 if (parent.type === 'JSXAttribute') {
-                    path.node.extra.raw = `{${jsText}('${key}')}`;
+                    if (isKey) {
+                        path.node.extra.raw = `'${key}'`;
+                    }
+                    else {
+                        path.node.extra.raw = `{${jsText}('${key}')}`;
+                    }
                 }
                 else {
                     // 其他的jsx 基本就是直接替换
-                    path.node.extra.raw = `${jsText}('${key}')`;
+                    if (isKey) {
+                        path.node.extra.raw = `'${key}'`;
+                    }
+                    else {
+                        path.node.extra.raw = `${jsText}('${key}')`;
+                    }
                 }
                 flag = true;
             }
@@ -267,9 +285,15 @@ function extractChineseFromScript(content, jsText) {
                         placeholders[placeholderName] = generate(path.node.expressions[index]).code;
                     }
                 });
-                const key = getchinseKey(transformedTemplate);
+                // 中文模板的不进行处理
+                const { key, isKey } = getchinseKey(transformedTemplate);
                 const keyData = JSON.stringify(placeholders).replace(/\"/g, '');
-                path.replaceWithSourceString(`${jsText}('${key}',${keyData})`);
+                if (isKey) {
+                    path.replaceWithSourceString(`'${key}&%&${keyData}'`);
+                }
+                else {
+                    path.replaceWithSourceString(`${jsText}('${key}',${keyData})`);
+                }
                 flag = true;
             }
         },
@@ -277,7 +301,7 @@ function extractChineseFromScript(content, jsText) {
             path.traverse({
                 // 处理jsx中标签包含的文本
                 JSXText(node) {
-                    const key = getchinseKey(node.node.value);
+                    const { key } = getchinseKey(node.node.value);
                     if (key) {
                         node.node.value = `{${jsText}('${key}')}`;
                         flag = true;
@@ -298,7 +322,6 @@ globalThis.useTranslations = [];
 function RollupI18nCreatePlugin(options) {
     let root = '';
     let isPro = false;
-    let isLang = false;
     // 配置
     const configOption = {
         ...options,
@@ -310,7 +333,8 @@ function RollupI18nCreatePlugin(options) {
         tempText: options.tempText || 't',
         jsText: options.jsText || 't',
         delay: options.delay || 1000,
-        reserveKeys: options.reserveKeys || []
+        reserveKeys: options.reserveKeys || [],
+        runBuild: options.runBuild || false,
     };
     const dealWithLangFile = debounce((i18nPath) => {
         updateJSONInFile(i18nPath, translationsMap);
@@ -321,7 +345,6 @@ function RollupI18nCreatePlugin(options) {
         configResolved(config) {
             root = config.root;
             isPro = config.isProduction;
-            isLang = config.mode === 'lang';
             translationsMap = {};
             if (!isPro) {
                 // 开发环境保留所有字段不进行任何的优化
@@ -331,8 +354,8 @@ function RollupI18nCreatePlugin(options) {
                     translationsMap[key] = obj[key];
                 });
             }
-            else if (configOption.reserveKeys.length) {
-                // 生产环境下对代码
+            else if (configOption?.reserveKeys?.length) {
+                // 生产环境下对代码, 对保留的key 不进行处理的key进行了处理
                 const obj = getFileJson(resolve(root, configOption.i18nPath));
                 Object.keys(obj).forEach(key => {
                     if (configOption.reserveKeys.includes(key)) {
@@ -367,7 +390,7 @@ function RollupI18nCreatePlugin(options) {
         },
         buildEnd() {
             // 打包构建的时候执行该代码, 这是打包阶段的了也是我们测试的时候使用
-            if (isLang) {
+            if (configOption.runBuild) {
                 const langFile = resolve(root, options.i18nPath);
                 // 这里整理所有的语言数据，所有的都是新的语言包，
                 updateJSONInFile(langFile, translationsMap);
@@ -384,6 +407,7 @@ function RollupI18nCreatePlugin(options) {
                                 obj[key] = lm[key];
                             }
                             else {
+                                // 新增的key 直接加入到末尾
                                 endList.push({
                                     key: key,
                                     value: translationsMap[key]

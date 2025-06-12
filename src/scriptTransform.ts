@@ -1,17 +1,16 @@
 import * as babelParser from '@babel/parser';
 
-import _traverse from "@babel/traverse"
+import _generate from "@babel/generator";
+import _traverse from "@babel/traverse";
 //@ts-ignore
 const traverse = _traverse.default;
-import _generate from "@babel/generator";
 //@ts-ignore
 const generate = _generate.default;
 
 import {
   containsChinese,
   getchinseKey
-} from './utils'
-import {OptionsType} from "./types";
+} from './utils';
 
 // 提取 script 中的中文
 export function extractChineseFromScript(content: string, jsText: string) {
@@ -38,13 +37,21 @@ export function extractChineseFromScript(content: string, jsText: string) {
           return
         }
       }
-      const key = getchinseKey(path.node.value)
+      const { key, isKey } = getchinseKey(path.node.value)
       if (key) {
         if (parent.type === 'JSXAttribute') {
-          path.node.extra.raw = `{${jsText}('${key}')}`
+          if (isKey) {
+            path.node.extra.raw = `'${key}'`
+          } else {
+            path.node.extra.raw = `{${jsText}('${key}')}`
+          }
         } else {
           // 其他的jsx 基本就是直接替换
-          path.node.extra.raw = `${jsText}('${key}')`
+          if (isKey) {
+            path.node.extra.raw = `'${key}'`
+          } else {
+            path.node.extra.raw = `${jsText}('${key}')`
+          }
         }
         flag = true
       }
@@ -71,10 +78,15 @@ export function extractChineseFromScript(content: string, jsText: string) {
             placeholders[placeholderName] = generate(path.node.expressions[index]).code;
           }
         });
-        const key = getchinseKey(transformedTemplate)
+        // 中文模板的不进行处理
+        const { key, isKey } = getchinseKey(transformedTemplate)
         const regex = new RegExp('`' + rawTemplate + '`');
         const keyData = JSON.stringify(placeholders).replace(/\"/g, '')
-        path.replaceWithSourceString(`${jsText}('${key}',${keyData})`)
+        if (isKey) { 
+          path.replaceWithSourceString(`'${key}&%&${keyData}'`)
+        } else {
+          path.replaceWithSourceString(`${jsText}('${key}',${keyData})`)
+        }
         flag = true
       }
     },
@@ -82,7 +94,7 @@ export function extractChineseFromScript(content: string, jsText: string) {
       path.traverse({
         // 处理jsx中标签包含的文本
         JSXText(node: any) {
-          const key = getchinseKey(node.node.value)
+          const { key } = getchinseKey(node.node.value)
           if (key) {
             node.node.value = `{${jsText}('${key}')}`
             flag = true

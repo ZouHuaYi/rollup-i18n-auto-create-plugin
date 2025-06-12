@@ -1,6 +1,6 @@
-import crypto from 'crypto'
-import fs  from 'fs'
-import JSON5  from 'json5'
+import crypto from 'crypto';
+import fs from 'fs';
+import JSON5 from 'json5';
 
 // 中文字符匹配函数（判断字符串是否包含中文字符）
 export function containsChinese(str: string) {
@@ -57,7 +57,7 @@ function generateKey(chineseStr: string) {
 export function getchinseKey (text: string) {
   let key = '';
   if (containsChinese(text)) {
-    const chineseText = text.trim();
+    const chineseText = text.trim().replace(/^&%&/, '');
     key = generateKey(chineseText);
     if (!translationsMap[key]) {
       addTranslations.push({
@@ -68,7 +68,15 @@ export function getchinseKey (text: string) {
     // 这里一定是 use key ,使用的key值，修改中文和书写中文的时候会一个 标注
     translationsMap[key] = chineseText
   }
-  return key
+  let isKey = false 
+  if (text) {
+    // 使用正则的方法进行判断
+    isKey = /^\&%\&/.test(text)
+  }
+  return {
+    key,
+    isKey
+  }
 }
 
 // 读取文件映射相关的内容

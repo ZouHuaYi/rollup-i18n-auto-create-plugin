@@ -48,8 +48,8 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
         Object.keys(obj).forEach(key => {
           translationsMap[key] = obj[key]
         })
-      } else if (configOption.reserveKeys.length) {
-        // 生产环境下对代码
+      } else if (configOption?.reserveKeys?.length) {
+        // 生产环境下对代码, 对保留的key 不进行处理的key进行了处理
         const obj = getFileJson(resolve(root, configOption.i18nPath))
         Object.keys(obj).forEach(key => {
           if (configOption.reserveKeys.includes(key)) {
@@ -101,6 +101,7 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
               if (lm[key]) {
                 obj[key] = lm[key]
               } else {
+                // 新增的key 直接加入到末尾
                 endList.push({
                   key: key,
                   value: translationsMap[key]

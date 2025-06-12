@@ -1,10 +1,10 @@
+import { parse } from '@vue/compiler-sfc';
 import {
   containsChinese,
-  extractTransformString,
   extractQuotedStrings,
+  extractTransformString,
   getchinseKey
-} from './utils'
-import { parse } from '@vue/compiler-sfc';
+} from './utils';
 
 // 对拼接的字符串进行处理整理
 export function concatenatedString (str: string, tempText: string) {
@@ -13,7 +13,7 @@ export function concatenatedString (str: string, tempText: string) {
   if (strList.length) {
     let strSource = str
     strList.forEach((item:string) => {
-      const key = getchinseKey(item.replace(/'|"/g, ''))
+      const { key } = getchinseKey(item.replace(/'|"/g, ''))
       if (key) {
         strSource = strSource.replace(item, `${tempText}('${key}')`)
       }
@@ -42,7 +42,7 @@ export function extractChineseFromTemplate(content:string, tempText: string) {
     if (node.type === 5 && containsChinese(node.content?.content)) {
       const tempStr = extractTransformString(node.content.content)
       if (tempStr) {
-        const key = getchinseKey(tempStr.key)
+        const { key } = getchinseKey(tempStr.key)
         if (key) {
          const results = source.replace(node.content?.content.trim(), `${tempText}('${key}', { ${tempStr.data} })`)
           templateContent = templateContent.replace(source, results)
@@ -57,7 +57,7 @@ export function extractChineseFromTemplate(content:string, tempText: string) {
     }
     // 这是 TEXT 类型
     if (node.type === 2) {
-      const key = getchinseKey(node.content)
+      const { key } = getchinseKey(node.content)
       if (key) {
         const results = source.replace(node.content.trim(), `{{${tempText}('${key}')}}`)
         templateContent = templateContent.replace(source, results)
@@ -71,7 +71,7 @@ export function extractChineseFromTemplate(content:string, tempText: string) {
         node.props.forEach((item: any) => {
           if (item.type === 6) {
             // 这个是纯的属性类型 title="我的测试"
-            const key = getchinseKey(item?.value?.content)
+            const { key } = getchinseKey(item?.value?.content)
             if (key) {
               pstr = pstr.replace(item.loc.source, `:${item.name}="${tempText}('${key}')"`)
             }
