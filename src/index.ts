@@ -1,21 +1,22 @@
-import { Plugin } from 'vite';
-import { OptionsType } from "./types";
+import { parse } from '@vue/compiler-sfc';
 import fs from "fs";
 import { resolve } from 'path';
-import { parse } from '@vue/compiler-sfc';
-import { extractChineseFromTemplate } from './templateTransform'
-import { extractChineseFromScript } from './scriptTransform'
-import {getFileJson, updateJSONInFile, debounce} from './utils'
+import { Plugin } from 'vite';
+import { extractChineseFromScript } from './scriptTransform';
+import { extractChineseFromTemplate } from './templateTransform';
+import { OptionsType } from "./types";
+import { debounce, getFileJson, updateJSONInFile } from './utils';
 
 globalThis.translationsMap = {}
 globalThis.addTranslations = []
 globalThis.useTranslations = []
+;(globalThis as any).keyLength = 16
 
 export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
   let root = '';
   let isPro = false
   // 配置
-   const configOption = {
+   const configOption: OptionsType = {
     ...options,
     injectToJS: options.injectToJS ? `\n${options.injectToJS}\n` : `\nimport { useI18n } from '@/hooks/web/useI18n'\nconst { t } = useI18n()\n`,
     i18nPath: options.i18nPath || 'src/locales/zh-CN.ts',
@@ -27,6 +28,9 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
     delay: options.delay || 1000,
     reserveKeys: options.reserveKeys || [],
     runBuild: options.runBuild || false,
+    keyLength: options.keyLength || 16,
+    cryptoKey: options.cryptoKey || 'i18n',
+    preText: options.preText || '',
    }
 
   const dealWithLangFile = debounce((i18nPath: string) => {
@@ -41,6 +45,8 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
       root = config.root;
       isPro = config.isProduction
       translationsMap = {}
+      ;(globalThis as any).keyLength = configOption.keyLength
+      ;(globalThis as any).cryptoKey = configOption.cryptoKey
       if (!isPro) {
         // 开发环境保留所有字段不进行任何的优化
         const obj = getFileJson(resolve(root, configOption.i18nPath))
@@ -69,9 +75,9 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
       }
       let rewrittenScript = code
       if (id.endsWith('.vue')) {
-        rewrittenScript = processVueFile(id, configOption) || ''
+        rewrittenScript = processVueFile(id, configOption as OptionsType) || ''
       } else if (['.ts', '.js', '.jsx', '.tsx'].some(i => id.split('?')[0].endsWith(i))) {
-        rewrittenScript = proesssJsFile(id, configOption)
+        rewrittenScript = proesssJsFile(id, configOption as OptionsType)
       }
       const langFile = resolve(root, configOption.i18nPath)
       if (!isPro && addTranslations.length) {

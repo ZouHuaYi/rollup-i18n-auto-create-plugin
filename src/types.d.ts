@@ -10,4 +10,7 @@ export interface OptionsType{
   delay: number
   reserveKeys: string[]
   runBuild: boolean
+  keyLength?: number
+  cryptoKey?: string
+  preText?: string
 }

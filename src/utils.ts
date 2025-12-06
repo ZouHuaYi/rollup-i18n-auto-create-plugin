@@ -48,9 +48,10 @@ export function extractTransformString(str: string) {
 
 // 生成唯一key
 function generateKey(chineseStr: string) {
-  const hash = crypto.createHmac('sha256', 'i18n').update(chineseStr).digest('hex');
-  // 保留加密结果的前16位
-  return hash.slice(0, 16)
+  const hash = crypto.createHmac('sha256', globalThis.cryptoKey || 'i18n').update(globalThis.preText + chineseStr).digest('hex');
+  // 保留加密结果的前N位，N由配置中的keyLength决定
+  const len = globalThis.keyLength || 16
+  return hash.slice(0, len)
 }
 
 // 获取和收集key

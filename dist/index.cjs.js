@@ -1,13 +1,13 @@
 'use strict';
 
+var compilerSfc = require('@vue/compiler-sfc');
 var fs = require('fs');
 var path = require('path');
-var compilerSfc = require('@vue/compiler-sfc');
-var crypto = require('crypto');
-var JSON5 = require('json5');
 var babelParser = require('@babel/parser');
 var _generate = require('@babel/generator');
 var _traverse = require('@babel/traverse');
+var crypto = require('crypto');
+var JSON5 = require('json5');
 
 function _interopNamespaceDefault(e) {
   var n = Object.create(null);
@@ -65,9 +65,10 @@ function extractTransformString(str) {
 }
 // 生成唯一key
 function generateKey(chineseStr) {
-    const hash = crypto.createHmac('sha256', 'i18n').update(chineseStr).digest('hex');
-    // 保留加密结果的前16位
-    return hash.slice(0, 16);
+    const hash = crypto.createHmac('sha256', globalThis.cryptoKey || 'i18n').update(globalThis.preText + chineseStr).digest('hex');
+    // 保留加密结果的前N位，N由配置中的keyLength决定
+    const len = globalThis.keyLength || 16;
+    return hash.slice(0, len);
 }
 // 获取和收集key
 function getchinseKey(text) {
@@ -138,102 +139,6 @@ function debounce(func, wait, immediate = false) {
             func.apply(context, args);
         }
     };
-}
-
-// 对拼接的字符串进行处理整理
-function concatenatedString(str, tempText) {
-    const strList = extractQuotedStrings(str);
-    if (!strList.length)
-        return;
-    if (strList.length) {
-        let strSource = str;
-        strList.forEach((item) => {
-            const { key } = getchinseKey(item.replace(/'|"/g, ''));
-            if (key) {
-                strSource = strSource.replace(item, `${tempText}('${key}')`);
-            }
-        });
-        return strSource;
-    }
-}
-// 提取 template 中的中文, 基本完成
-function extractChineseFromTemplate(content, tempText) {
-    if (!content) {
-        return;
-    }
-    let templateContent = content;
-    // // 使用@vue/compiler-sfc来解析模板
-    const descriptor = compilerSfc.parse(`<template>${content}</template>`).descriptor;
-    // 获取模板的AST
-    const ast = descriptor.template?.ast;
-    if (!ast)
-        return content;
-    // 定义一个函数来递归遍历AST并收集所有文本节点和插值节点
-    // AST 逆向 template 存在者问题这里使用替换的方式进行处理
-    function extractNodes(node, source) {
-        // 这是中的类型 {{ }}, 事件，也就是模板解析的都在这里
-        if (node.type === 5 && containsChinese(node.content?.content)) {
-            const tempStr = extractTransformString(node.content.content);
-            if (tempStr) {
-                const { key } = getchinseKey(tempStr.key);
-                if (key) {
-                    const results = source.replace(node.content?.content.trim(), `${tempText}('${key}', { ${tempStr.data} })`);
-                    templateContent = templateContent.replace(source, results);
-                }
-            }
-            else {
-                const strSource = concatenatedString(node.content.content, tempText);
-                if (strSource) {
-                    const results = source.replace(node.content?.content.trim(), strSource);
-                    templateContent = templateContent.replace(source, results);
-                }
-            }
-        }
-        // 这是 TEXT 类型
-        if (node.type === 2) {
-            const { key } = getchinseKey(node.content);
-            if (key) {
-                const results = source.replace(node.content.trim(), `{{${tempText}('${key}')}}`);
-                templateContent = templateContent.replace(source, results);
-            }
-        }
-        if (node.children) {
-            let pstr = node.loc.source;
-            // 优先处理属性值
-            if (node?.props?.length) {
-                // 这里是处理属性值的地方
-                node.props.forEach((item) => {
-                    if (item.type === 6) {
-                        // 这个是纯的属性类型 title="我的测试"
-                        const { key } = getchinseKey(item?.value?.content);
-                        if (key) {
-                            pstr = pstr.replace(item.loc.source, `:${item.name}="${tempText}('${key}')"`);
-                        }
-                    }
-                    else if (item.type === 7 && item.exp?.content) {
-                        // 这里是一个bind 这里统一对 等号后面的字符串提取出来处理
-                        const strSource = concatenatedString(item.exp.content, tempText);
-                        if (strSource) {
-                            pstr = pstr.replace(item.exp.content, strSource);
-                        }
-                    }
-                });
-                templateContent = templateContent.replace(node.loc.source, pstr);
-            }
-            // 同级的children 值
-            node.children.forEach((item) => {
-                // res 修改的值就是父级的值，父级的 source
-                extractNodes(item, pstr);
-            });
-        }
-    }
-    // 检查 AST 的有效性
-    if (ast.children && ast.children.length > 0) {
-        ast.children.forEach((child) => {
-            extractNodes(child, ast.source);
-        });
-        return templateContent;
-    }
 }
 
 //@ts-ignore
@@ -337,9 +242,106 @@ function extractChineseFromScript(content, jsText) {
     }
 }
 
+// 对拼接的字符串进行处理整理
+function concatenatedString(str, tempText) {
+    const strList = extractQuotedStrings(str);
+    if (!strList.length)
+        return;
+    if (strList.length) {
+        let strSource = str;
+        strList.forEach((item) => {
+            const { key } = getchinseKey(item.replace(/'|"/g, ''));
+            if (key) {
+                strSource = strSource.replace(item, `${tempText}('${key}')`);
+            }
+        });
+        return strSource;
+    }
+}
+// 提取 template 中的中文, 基本完成
+function extractChineseFromTemplate(content, tempText) {
+    if (!content) {
+        return;
+    }
+    let templateContent = content;
+    // // 使用@vue/compiler-sfc来解析模板
+    const descriptor = compilerSfc.parse(`<template>${content}</template>`).descriptor;
+    // 获取模板的AST
+    const ast = descriptor.template?.ast;
+    if (!ast)
+        return content;
+    // 定义一个函数来递归遍历AST并收集所有文本节点和插值节点
+    // AST 逆向 template 存在者问题这里使用替换的方式进行处理
+    function extractNodes(node, source) {
+        // 这是中的类型 {{ }}, 事件，也就是模板解析的都在这里
+        if (node.type === 5 && containsChinese(node.content?.content)) {
+            const tempStr = extractTransformString(node.content.content);
+            if (tempStr) {
+                const { key } = getchinseKey(tempStr.key);
+                if (key) {
+                    const results = source.replace(node.content?.content.trim(), `${tempText}('${key}', { ${tempStr.data} })`);
+                    templateContent = templateContent.replace(source, results);
+                }
+            }
+            else {
+                const strSource = concatenatedString(node.content.content, tempText);
+                if (strSource) {
+                    const results = source.replace(node.content?.content.trim(), strSource);
+                    templateContent = templateContent.replace(source, results);
+                }
+            }
+        }
+        // 这是 TEXT 类型
+        if (node.type === 2) {
+            const { key } = getchinseKey(node.content);
+            if (key) {
+                const results = source.replace(node.content.trim(), `{{${tempText}('${key}')}}`);
+                templateContent = templateContent.replace(source, results);
+            }
+        }
+        if (node.children) {
+            let pstr = node.loc.source;
+            // 优先处理属性值
+            if (node?.props?.length) {
+                // 这里是处理属性值的地方
+                node.props.forEach((item) => {
+                    if (item.type === 6) {
+                        // 这个是纯的属性类型 title="我的测试"
+                        const { key } = getchinseKey(item?.value?.content);
+                        if (key) {
+                            pstr = pstr.replace(item.loc.source, `:${item.name}="${tempText}('${key}')"`);
+                        }
+                    }
+                    else if (item.type === 7 && item.exp?.content) {
+                        // 这里是一个bind 这里统一对 等号后面的字符串提取出来处理
+                        const strSource = concatenatedString(item.exp.content, tempText);
+                        if (strSource) {
+                            pstr = pstr.replace(item.exp.content, strSource);
+                        }
+                    }
+                });
+                templateContent = templateContent.replace(node.loc.source, pstr);
+            }
+            // 同级的children 值
+            node.children.forEach((item) => {
+                // res 修改的值就是父级的值，父级的 source
+                extractNodes(item, pstr);
+            });
+        }
+    }
+    // 检查 AST 的有效性
+    if (ast.children && ast.children.length > 0) {
+        ast.children.forEach((child) => {
+            extractNodes(child, ast.source);
+        });
+        return templateContent;
+    }
+}
+
 globalThis.translationsMap = {};
 globalThis.addTranslations = [];
 globalThis.useTranslations = [];
+globalThis.keyLength = 16;
 function RollupI18nCreatePlugin(options) {
     let root = '';
     let isPro = false;
@@ -356,6 +358,9 @@ function RollupI18nCreatePlugin(options) {
         delay: options.delay || 1000,
         reserveKeys: options.reserveKeys || [],
         runBuild: options.runBuild || false,
+        keyLength: options.keyLength || 16,
+        cryptoKey: options.cryptoKey || 'i18n',
+        preText: options.preText || '',
     };
     const dealWithLangFile = debounce((i18nPath) => {
         updateJSONInFile(i18nPath, translationsMap);
@@ -367,6 +372,8 @@ function RollupI18nCreatePlugin(options) {
             root = config.root;
             isPro = config.isProduction;
             translationsMap = {};
+            globalThis.keyLength = configOption.keyLength;
+            globalThis.cryptoKey = configOption.cryptoKey;
             if (!isPro) {
                 // 开发环境保留所有字段不进行任何的优化
                 const obj = getFileJson(path.resolve(root, configOption.i18nPath));
