@@ -44,7 +44,8 @@ function extractTransformString(str) {
 }
 // 生成唯一key
 function generateKey(chineseStr) {
-    const hash = crypto.createHmac('sha256', globalThis.cryptoKey || 'i18n').update(globalThis.preText + chineseStr).digest('hex');
+    const text = globalThis.preText + chineseStr;
+    const hash = crypto.createHmac('sha256', globalThis.cryptoKey).update(text).digest('hex');
     // 保留加密结果的前N位，N由配置中的keyLength决定
     const len = globalThis.keyLength || 16;
     return hash.slice(0, len);
@@ -353,6 +354,7 @@ function RollupI18nCreatePlugin(options) {
             translationsMap = {};
             globalThis.keyLength = configOption.keyLength;
             globalThis.cryptoKey = configOption.cryptoKey;
+            globalThis.preText = configOption.preText;
             if (!isPro) {
                 // 开发环境保留所有字段不进行任何的优化
                 const obj = getFileJson(resolve(root, configOption.i18nPath));

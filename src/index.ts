@@ -47,6 +47,7 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
       translationsMap = {}
       ;(globalThis as any).keyLength = configOption.keyLength
       ;(globalThis as any).cryptoKey = configOption.cryptoKey
+      ;(globalThis as any).preText = configOption.preText
       if (!isPro) {
         // 开发环境保留所有字段不进行任何的优化
         const obj = getFileJson(resolve(root, configOption.i18nPath))
