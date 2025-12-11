@@ -398,7 +398,7 @@ function RollupI18nCreatePlugin(options) {
             // 不是 vue 文件的时候不进行处理
             if (configOption.excludes.some(i => id.includes(i)) ||
                 id.includes('node_modules') ||
-                id.includes('\x00')) {
+                id.includes('\x00') || !configOption.runBuild) {
                 return code;
             }
             let rewrittenScript = code;

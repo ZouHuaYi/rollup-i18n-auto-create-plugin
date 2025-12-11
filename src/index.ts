@@ -70,7 +70,7 @@ export default function RollupI18nCreatePlugin(options: OptionsType): Plugin {
       if (
         configOption.excludes.some(i => id.includes(i)) ||
         id.includes('node_modules') ||
-        id.includes('\x00'))
+        id.includes('\x00') || !configOption.runBuild)
       {
         return code;
       }
