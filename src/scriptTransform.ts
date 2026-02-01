@@ -80,12 +80,11 @@ export function extractChineseFromScript(content: string, jsText: string) {
         });
         // 中文模板的不进行处理
         const { key, isKey } = getchinseKey(transformedTemplate)
-        const regex = new RegExp('`' + rawTemplate + '`');
-        const keyData = JSON.stringify(placeholders).replace(/\"/g, '')
+        const keyData = `{ ${Object.entries(placeholders).map(([k, v]) => `${k}: ${v}`).join(', ')} }`
         if (isKey) { 
           path.replaceWithSourceString(`'${key}&%&${keyData}'`)
         } else {
-          path.replaceWithSourceString(`${jsText}('${key}',${keyData})`)
+          path.replaceWithSourceString(`${jsText}('${key}', ${keyData})`)
         }
         flag = true
       }
