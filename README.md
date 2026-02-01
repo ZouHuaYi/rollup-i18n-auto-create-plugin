@@ -1,25 +1,29 @@
-# Vue3 + Vite 多语言自动替换插件
+# Rollup I18n Auto Create Plugin (Vite Plugin)
 
-这是一个 Vue3 + Vite 插件，旨在实现多语言自动替换功能。插件能够自动识别 Vue 组件中的中文文本，并将其替换为相应的国际化函数调用，以支持多语言。
+这是一个针对 Vue3 + Vite 开发环境设计的 i18n 自动化插件。它能够自动识别项目代码（.vue, .js, .ts, .jsx, .tsx）中的中文字符串，将其替换为国际化调用函数（如 `t('key')`），并自动维护语言映射文件。
 
 ## 功能特点
 
-- 自动提取 Vue 模板和脚本中的中文文本。
-- 将提取的中文文本替换为国际化函数调用。
-- 支持处理 `.vue`、`.js`、`.ts`、`.jsx` 和 `.tsx` 文件。
-- 在开发模式下实时更新语言文件。
-- 在构建时创建新的语言包。
+- **全场景支持**：支持 Vue 模板、Script 脚本、JSX/TSX 语法。
+- **智能替换**：自动处理普通字符串、模板字符串（Template Literals）以及 JSX 属性/文本。
+- **自动化维护**：开发环境下实时提取并更新 `zh-CN` 映射文件；打包时可同步整理多语言包。
+- **安全过滤**：自动排除 `console.log`、`alert` 中的中文，避免干扰调试。
+- **特殊符号兼容**：自动转义 `@` 符号（`@@`），完美兼容 `vue-i18n` 的链接消息语法。
+- **高度可定制**：支持自定义 Key 生成规则（长度、加密密钥、前缀等）。
 
 ## 安装
 
-```javascript
-npm install rollup-i18n-auto-create-plugin
+```bash
+npm install rollup-i18n-auto-create-plugin -D
 # 或者
-yarn add rollup-i18n-auto-create-plugin
+pnpm add rollup-i18n-auto-create-plugin -D
 ```
+
 ## 使用方法
 
-```javascript
+在 `vite.config.ts` 中配置：
+
+```typescript
 import RollupI18nCreatePlugin from 'rollup-i18n-auto-create-plugin'
 
 export default defineConfig({
@@ -33,217 +37,63 @@ export default defineConfig({
       tempText: 't',
       regi18n: 'useI18n',
       delay: 1000,
-      reserveKeys: ['test']
+      runBuild: true,
+      // 新增配置项
+      keyLength: 16,
+      cryptoKey: 'your-secret-key',
+      preText: 'APP_'
     }),
   ]
 })
 ```
 
-## 选项说明
-- i18nPath: 语言文件的路径。
-- langPath: 打包的时候处理语言文件的路径数组。
-- tempText: （可选）模板文本。
-- excludes： (可选) 排除文件名称。
-- jsText: （可选）JavaScript 模板文本。
-- regi18n: 判断是否要出入以来的文本，如果已经有就不需要插入，存在如果是注释的时候没有办法兼容。
-- injectToJS: （可选）要注入到 JavaScript 中的文本。
-- delay: （可选）处理文件之间的延迟时间，默认为 1000。
-- reserveKeys: (可选) 需要保留的key
-- runBuild: (可选) 打包的时候是否需要执行整理多语言文件。
+## 配置项说明
 
-```javascript
-i18nPath: string
-langPath: string[]
-regi18n: string
-excludes: string[]
-tempText: string
-jsText: string
-injectToJS?: string
-delay: number
-reserveKeys: string[]
-runBuild: boolean
-```
+| 参数 | 类型 | 默认值 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `i18nPath` | `string` | `src/locales/zh-CN.ts` | 主语言文件（通常是中文）的存储路径 |
+| `langPath` | `string[]` | `['src/locales/en.ts']` | 其他语言文件的路径数组（打包时同步更新 Key） |
+| `tempText` | `string` | `t` | 模板中生成的国际化函数名 |
+| `jsText` | `string` | `t` | JS/TS 脚本中生成的国际化函数名 |
+| `regi18n` | `string` | `useI18n` | 用于判断文件是否已引入国际化钩子的标识符 |
+| `injectToJS` | `string` | (详见说明) | 自动注入到 Script 顶部的引入代码 |
+| `excludes` | `string[]` | `['locale', 'useI18n']` | 排除的文件名或路径片段 |
+| `delay` | `number` | `1000` | 开发环境下处理文件的防抖延迟（ms） |
+| `reserveKeys` | `string[]` | `[]` | 生产环境下需要保留（不被清理）的 Key |
+| `runBuild` | `boolean` | `false` | 打包时是否执行语言文件整理和同步 |
+| `keyLength` | `number` | `16` | 生成 Key 的哈希长度 |
+| `cryptoKey` | `string` | `i18n` | 用于生成哈希的 HMAC 密钥 |
+| `preText` | `string` | `''` | 生成 Key 前在原文前增加的固定前缀 |
 
 ## 工作原理
-插件使用 @vue/compiler-sfc 解析 Vue 文件，并递归遍历 AST 以提取中文文本。对于 JavaScript 脚本，插件使用 Babel 解析和遍历 AST。提取的中文文本将被替换为国际化函数调用。
 
-## 注意
-> 该项目的默认配置是针对 [element-plus-admin](https://element-plus-admin.cn/) 项目，
-> 在其他项目中没有认真测试过
+1. **解析阶段**：利用 `@vue/compiler-sfc` 解析 `.vue` 文件，使用 Babel (`@babel/parser`) 解析 JS/TS/JSX 代码。
+2. **提取阶段**：递归遍历 AST（抽象语法树），识别所有未被排除的中文字符串。
+3. **生成阶段**：
+    - 根据原文 + `preText` + `cryptoKey` 生成唯一哈希作为 Key。
+    - 将原文内容存入 `i18nPath` 指定的文件。
+    - 针对包含 `@` 的文本自动转义为 `@@`，防止 `vue-i18n` 报错。
+4. **替换阶段**：将代码中的中文字符串改写为配置的 `t('key')` 调用。
 
-1、针对 element-plus-admin 的项目修改
-- src/hooks/web/useI18n.ts
-![img.png](img.png)
+## 注意事项
 
-2、在开发环境中使用该插件项目会比较卡顿，而且在修改中文的时候整个页面会在1s后才刷新因为这里我用了防抖，所以建议在生成环境中才开启
+- **开发环境刷新**：由于为了性能考虑加入了 1s 的防抖处理，修改中文后页面刷新会有微小延迟。
+- **@ 符号处理**：插件会自动处理文本中的 `@` 符号，确保在 `vue-i18n` 中能正常渲染为原样文本。
+- **老项目迁移**：如果你需要将已有的 `t('key')` 代码还原回中文，可以参考 `src/migrate.ts` 迁移脚本。
 
-- 配置整理多语言文件
-> 在打包环境下配置 runBuild: true, 会自动对语言文件进行整理
+## 迁移工具
 
+如果你需要将一个已经手动写满 `t('key')` 的老项目转化回中文（以便配合本插件使用），可以使用 `src/migrate.ts` 脚本。
 
-## 老项目转化
-> 如果你是一个老的项目这种情况下要想愉快的使用该插件那么你就要把原来写的t(key)
-转化成中文，我写了一份转化的代码，可供大家参考
+该脚本已进行优化，支持：
+1. **递归扫描**：自动遍历 `src` 目录下的所有 `.vue, .ts, .js, .tsx, .jsx` 文件。
+2. **插值表达式还原**：将 `{{ t('key') }}` 还原为中文。
+3. **属性绑定还原**：将 `:title="t('key')"` 还原为静态属性 `title="中文"`（原版文档中提到的无法转化的问题已解决）。
+4. **脚本代码还原**：将 Script 或 JS 文件中的 `t('key')` 调用还原为字符串 `'中文'`。
 
-下面转化代码不是万能的，这里只是针对了，大部分情况转化，组件属性比如 :title=t(key)，无法转化，剩余的自己手动处理吧！
-
-```javascript
-
-/*
-* 把你的中文映射文案的文件整理出来
-* */
-
-const fs = require('fs');
-const path = require('path');
-const { parse  } = require('@vue/compiler-sfc');
-const babelParser = require('@babel/parser');
-const babelTraverse = require('@babel/traverse').default;
-const jsgenerate = require('@babel/generator').default;
-const langMap = require('./zh-CN')
-
-// 处理vue文件
-function dwVueFile (file) {
-  let vueFileContent = fs.readFileSync(file, 'utf-8')
-  const { descriptor, errors } = parse(vueFileContent);
-
-  // 如果解析时发生错误，打印错误信息
-  if (errors && errors.length) {
-    console.error('Errors occurred while parsing the Vue file:', vuePath);
-    return;
-  }
-  const temp = dvVueCentent(descriptor.template)
-  if (temp) {
-    vueFileContent = vueFileContent.replace(descriptor.template.content, temp)
-  }
-  const dsScript = descriptor.script || descriptor.scriptSetup
-  let scriptTemp = dvTsCentent(dsScript.content)
-  if (scriptTemp) {
-    vueFileContent = vueFileContent.replace(dsScript.content, scriptTemp)
-  }
-  fs.writeFileSync(file, vueFileContent, 'utf-8');
-}
-
-// 处理js, ts，jsx等文件
-function dvTsFile (file) {
-  const content = fs.readFileSync(file, 'utf-8')
-  const code = dvTsCentent(content)
-  if (code) {
-    fs.writeFileSync(file, code, 'utf-8');
-  }
-}
-
-function dvTsCentent (content) {
-  if (!content) return;
-  const ast = babelParser.parse(content, {
-    sourceType: 'module',
-    plugins: ['jsx', 'typescript'],
-  });
-  let flag = false
-  babelTraverse(ast, {
-    CallExpression(path) {
-      try {
-        if (path.node.callee.name === 't') {
-          const pkey = objToStr(path.node.arguments[0].value)
-          if (pkey) {
-            if (path.parent.type === 'JSXExpressionContainer') {
-              if (path.parentPath.parent.type === 'JSXElement') {
-                // jsx 中的中文会带上双引号和单引号
-                path.parentPath.replaceWithSourceString(pkey)
-              } else {
-                // 这个是属性，和函数一类
-                path.parentPath.replaceWith({
-                  type: 'StringLiteral',
-                  value: pkey
-                })
-              }
-
-            } else {
-              path.replaceWithSourceString("'" + pkey + "'")
-            }
-            flag = true
-          }
-        }
-      } catch (e) { }
-    }
-  })
-  if (flag) {
-    return jsgenerate(ast, {
-      jsescOption: { minimal: true },
-    }).code
-  }
-}
-
-function dvVueCentent (template) {
-  if (!template || !template.content) {
-    console.log('No template content found.');
-    return;
-  }
-  let templateContent = template.content
-  // 全局替换正则
-  templateContent = templateContent.replace(/{{\s*t\('([^']+)'\)\s*}}/g, (_, matched) => {
-    return objToStr(matched) || '没有key'
-  });
-  return templateContent
-}
-
-// 替换为字符的函数和方法
-function objToStr (key) {
-  if (!key) return
-  try {
-    const keys = key?.split('.')
-    let objstr = langMap[keys[0]]
-    for (let i = 1; i < keys.length; i++) {
-      objstr = objstr[keys[i]]
-    }
-    return objstr
-  } catch (e) {
-    return `没有key ${key}`
-  }
-}
-
-// 读取文件夹中的.vue 文件
-function readVueFiles(dir) {
-  const vueFiles = [];
-  const jsFiles = []
-  // 递归函数来遍历目录
-  function traverseDirectory(currentPath) {
-    const files = fs.readdirSync(currentPath);
-    files.forEach(file => {
-      const filePath = path.join(currentPath, file);
-      const stat = fs.statSync(filePath);
-      if (stat.isDirectory()) {
-        // 如果是目录，则递归遍历
-        traverseDirectory(filePath);
-      } else if (path.extname(file) === '.vue') {
-        vueFiles.push(filePath);
-      } else if (['.ts', '.tsx', '.js'].includes(path.extname(file)) && !filePath.includes('locale')) {
-        jsFiles.push(filePath)
-      }
-    });
-  }
-  // 开始遍历
-  traverseDirectory(dir);
-  return {vue: vueFiles, js: jsFiles}
-}
-
-function init (dir) {
-  const {js, vue} = readVueFiles(dir)
-  js.forEach(file => {
-    dvTsFile(file)
-  })
-  vue.forEach(file => {
-    dwVueFile(file)
-  })
-}
-
-// 目录
-init('file\\src')
-
-```
+**使用说明：**
+由于每个项目的路径配置不同，请在使用前修改 `src/migrate.ts` 中的 `options` 配置（如语言包路径、源码目录等）。
 
 ## 许可证
-MIT
 
-```javascript
-请根据实际情况调整上述内容。如果您有其他需要添加的信息或者有特定的格式要求，请告诉我。
-```
+MIT

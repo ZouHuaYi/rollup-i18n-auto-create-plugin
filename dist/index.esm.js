@@ -55,15 +55,17 @@ function getchinseKey(text) {
     let key = '';
     if (containsChinese(text)) {
         const chineseText = text.trim().replace(/^&%&/, '');
+        // 转义 @ 符号，防止 vue-i18n 将其误认为“链接消息”导致报错
+        const escapedText = chineseText.replace(/@/g, '@@');
         key = generateKey(chineseText);
         if (!translationsMap[key]) {
             addTranslations.push({
                 key,
-                value: chineseText
+                value: escapedText
             });
         }
         // 这里一定是 use key ,使用的key值，修改中文和书写中文的时候会一个 标注
-        translationsMap[key] = chineseText;
+        translationsMap[key] = escapedText;
     }
     let isKey = false;
     if (text) {
@@ -193,12 +195,12 @@ function extractChineseFromScript(content, jsText) {
                 });
                 // 中文模板的不进行处理
                 const { key, isKey } = getchinseKey(transformedTemplate);
-                const keyData = JSON.stringify(placeholders).replace(/\"/g, '');
+                const keyData = `{ ${Object.entries(placeholders).map(([k, v]) => `${k}: ${v}`).join(', ')} }`;
                 if (isKey) {
                     path.replaceWithSourceString(`'${key}&%&${keyData}'`);
                 }
                 else {
-                    path.replaceWithSourceString(`${jsText}('${key}',${keyData})`);
+                    path.replaceWithSourceString(`${jsText}('${key}', ${keyData})`);
                 }
                 flag = true;
             }
